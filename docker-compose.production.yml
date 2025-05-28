@@ -1,0 +1,120 @@
+version: '3.4'
+
+services:
+  op-geth:
+    image: ghcr.io/zypher-game/zytron-op-geth:main-2be5dcd-1732350081669
+    container_name: zytron-op-geth
+    ports:
+      - "30303:30303"
+      - "8545:8545"
+      - "8546:8546"
+      - "8551:8551"
+    volumes:
+      - /data/geth:/data
+      - /opt/opbnb-deployment/cfg/jwt.txt:/opt/secret.txt
+      - /opt/opbnb-deployment/cfg/genesis.json:/opt/genesis.json
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s 127.0.0.1:8551 || exit 1"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+
+  op-node:
+    # 使用新的统一镜像
+    image: ghcr.io/zypher-game/opbnb:latest
+    container_name: opbnb-node
+    ports:
+      - "9545:9545"
+      - "9222:9222"
+      - "9222:9222/udp"
+    volumes:
+      - /opt/opbnb-deployment/cfg/jwt.txt:/opt/secret.txt
+      - /opt/opbnb-deployment/cfg/rollup.json:/opt/rollup.json
+    depends_on:
+      op-geth:
+        condition: service_healthy
+    # 使用统一镜像的命令格式
+    command: ["./op-node"]
+    environment:
+      - OP_NODE_L1_MAX_CONCURRENCY=900
+      - OP_NODE_L1_PREFETCHING_WINDOW=1000
+      - OP_NODE_L1_RPC_MAX_BATCH_SIZE=500
+      - OP_NODE_L1_TRUST_RPC=true
+      - OP_NODE_L2_SKIP_SYNC_START_CHECK=true
+      - OP_NODE_DA_RPC=http://172.17.0.1:26659
+      - OP_NODE_DA_NAMESPACE=0x00000000000000000000000000000000000000f7b444f706c0d7c08913
+      - OP_NODE_L2_ENGINE_RPC=http://172.17.0.1:8551
+      - OP_NODE_L2_ENGINE_AUTH=/opt/secret.txt
+      - OP_NODE_SEQUENCER_ENABLED=true
+      - OP_NODE_SEQUENCER_L1_CONFS=3
+      - OP_NODE_VERIFIER_L1_CONFS=3
+      - OP_NODE_ROLLUP_CONFIG=/opt/rollup.json
+      - OP_NODE_RPC_ADDR=0.0.0.0
+      - OP_NODE_RPC_PORT=9545
+      - OP_NODE_RPC_ENABLE_ADMIN=true
+      - OP_NODE_P2P_DISABLE=true
+      - OP_NODE_P2P_SEQUENCER_KEY=e222a2b16b80de515188bb33e87977eb97d08f32658b97c9ce4ef766d064335b
+      - OP_NODE_L1_ETH_RPC=https://bsc-testnet.blockpi.network/v1/rpc/a73441396ab2a2822978a31241a7ef86baa955d0
+      - OP_NODE_L1_RPC_KIND=basic
+      - OP_BATCHER_DA_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.hAV0iQDsu7vAgc5OqQuuuUzvMht_fh-OSpyHpnRL0e4
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s 127.0.0.1:9545 || exit 1"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+
+  op-batcher:
+    # 使用新的统一镜像
+    image: ghcr.io/zypher-game/opbnb:latest
+    container_name: opbnb-batcher
+    ports:
+      - "8547:8547"
+    depends_on:
+      op-node:
+        condition: service_healthy
+    # 使用统一镜像的命令格式
+    command: ["./op-batcher"]
+    environment:
+      - OP_NODE_DA_RPC=http://172.17.0.1:26659
+      - OP_NODE_DA_NAMESPACE=0x00000000000000000000000000000000000000f7b444f706c0d7c08913
+      - OP_BATCHER_DA_RPC=http://172.17.0.1:26659
+      - OP_BATCHER_DA_NAMESPACE=0x00000000000000000000000000000000000000f7b444f706c0d7c08913
+      - OP_BATCHER_DA_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.hAV0iQDsu7vAgc5OqQuuuUzvMht_fh-OSpyHpnRL0e4
+      - OP_BATCHER_L2_ETH_RPC=http://172.17.0.1:8545
+      - OP_BATCHER_ROLLUP_RPC=http://172.17.0.1:9545
+      - OP_BATCHER_POLL_INTERVAL=120s
+      - OP_BATCHER_SUB_SAFETY_MARGIN=6
+      - OP_BATCHER_NUM_CONFIRMATIONS=1
+      - OP_BATCHER_SAFE_ABORT_NONCE_TOO_LOW_COUNT=3
+      - OP_BATCHER_RESUBMISSION_TIMEOUT=30s
+      - OP_BATCHER_RPC_ADDR=0.0.0.0
+      - OP_BATCHER_RPC_PORT=8547
+      - OP_BATCHER_RPC_ENABLE_ADMIN=true
+      - OP_BATCHER_MAX_CHANNEL_DURATION=1
+      - OP_BATCHER_L1_ETH_RPC=https://bsc-testnet.blockpi.network/v1/rpc/a73441396ab2a2822978a31241a7ef86baa955d0
+      - OP_BATCHER_PRIVATE_KEY=56d85caae82129ca1c18ce3e2a632e26457109df6f4d050e118530dce4908a91
+
+  op-proposer:
+    # 使用新的统一镜像
+    image: ghcr.io/zypher-game/opbnb:latest
+    container_name: opbnb-proposer
+    ports:
+      - "8548:8548"
+    depends_on:
+      op-node:
+        condition: service_healthy
+    # 使用统一镜像的命令格式
+    command: ["./op-proposer"]
+    environment:
+      - OP_NODE_DA_RPC=http://172.17.0.1:26659
+      - OP_NODE_DA_NAMESPACE=0x00000000000000000000000000000000000000f7b444f706c0d7c08913
+      - OP_PROPOSER_POLL_INTERVAL=120s
+      - OP_PROPOSER_RPC_ADDR=0.0.0.0
+      - OP_PROPOSER_RPC_PORT=8548
+      - OP_PROPOSER_ROLLUP_RPC=http://172.17.0.1:9545
+      - OP_PROPOSER_L2OO_ADDRESS=0xa16dd0c5e78dc8594c21f00850a913a0d95cd556
+      - OP_PROPOSER_PRIVATE_KEY=da3b4c560630d9088802177548c9fff81f55c2f245eb7fac47356c0eaefd465c
+      - OP_PROPOSER_L1_ETH_RPC=https://bsc-testnet.blockpi.network/v1/rpc/a73441396ab2a2822978a31241a7ef86baa955d0
+      - OP_PROPOSER_ALLOW_NON_FINALIZED=true
+      - OP_BATCHER_DA_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.hAV0iQDsu7vAgc5OqQuuuUzvMht_fh-OSpyHpnRL0e4
+      - OP_PROPOSER_RPC_ENABLE_ADMIN=true 

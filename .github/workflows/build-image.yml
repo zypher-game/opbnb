@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-image:
-    name: Build Image
+    name: Build Unified Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,7 +45,7 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value={{branch}}-{{sha}}-{{date 'X'}}
 
-    - name: Build and push Docker image
+    - name: Build and push unified Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -55,4 +55,6 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
-        cache-to: type=gha,mode=max 
+        cache-to: type=gha,mode=max
+        build-args: |
+          VERSION=${{ github.ref_name }}-${{ github.sha }} 

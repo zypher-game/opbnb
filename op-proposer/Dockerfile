@@ -23,7 +23,12 @@ ARG TARGETOS TARGETARCH
 
 ENV CGO_CFLAGS="-O -D__BLST_PORTABLE__"
 ENV CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
-RUN make op-proposer VERSION="$VERSION" GOOS=$TARGETOS GOARCH=$TARGETARCH
+
+# Build the binary directly with go build instead of using make
+RUN GITCOMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown") && \
+    GITDATE=$(git show -s --format='%ct' 2>/dev/null || echo "0") && \
+    LDFLAGS="-X main.GitCommit=${GITCOMMIT} -X main.GitDate=${GITDATE} -X main.Version=${VERSION}" && \
+    CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "${LDFLAGS}" -o ./bin/op-proposer ./cmd
 
 FROM alpine:3.18
 

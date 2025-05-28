@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  op-node:
+    image: ghcr.io/zypher-game/opbnb:latest
+    container_name: opbnb-node
+    command: ["./op-node"]
+    ports:
+      - "8545:8545"  # HTTP RPC
+      - "8546:8546"  # WebSocket RPC
+      - "9222:9222"  # P2P
+    volumes:
+      - op-node-data:/data
+    environment:
+      - OP_NODE_L1_ETH_RPC=https://ethereum-rpc-url
+      - OP_NODE_L2_ENGINE_RPC=http://op-geth:8551
+      - OP_NODE_ROLLUP_CONFIG=/config/rollup.json
+    restart: unless-stopped
+
+  op-batcher:
+    image: ghcr.io/zypher-game/opbnb:latest
+    container_name: opbnb-batcher
+    command: ["./op-batcher"]
+    depends_on:
+      - op-node
+    environment:
+      - OP_BATCHER_L1_ETH_RPC=https://ethereum-rpc-url
+      - OP_BATCHER_L2_ETH_RPC=http://op-node:8545
+      - OP_BATCHER_ROLLUP_RPC=http://op-node:9545
+    restart: unless-stopped
+
+  op-proposer:
+    image: ghcr.io/zypher-game/opbnb:latest
+    container_name: opbnb-proposer
+    command: ["./op-proposer"]
+    depends_on:
+      - op-node
+    environment:
+      - OP_PROPOSER_L1_ETH_RPC=https://ethereum-rpc-url
+      - OP_PROPOSER_ROLLUP_RPC=http://op-node:9545
+      - OP_PROPOSER_L2OO_ADDRESS=0x...
+    restart: unless-stopped
+
+volumes:
+  op-node-data:
+
+networks:
+  default:
+    name: opbnb-network 
