@@ -24,12 +24,7 @@ ARG TARGETARCH
 
 ENV CGO_CFLAGS="-O -D__BLST_PORTABLE__"
 ENV CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
-
-# Build the binary directly with go build instead of using make
-RUN GITCOMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown") && \
-    GITDATE=$(git show -s --format='%ct' 2>/dev/null || echo "0") && \
-    LDFLAGS="-X main.GitCommit=${GITCOMMIT} -X main.GitDate=${GITDATE} -X github.com/ethereum-optimism/optimism/op-node/version.Version=${VERSION}" && \
-    CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "${LDFLAGS}" -o ./bin/op-node ./cmd/main.go
+RUN make op-node VERSION="$VERSION" GOOS=$TARGETOS GOARCH=$TARGETARCH
 
 FROM alpine:3.18
 
